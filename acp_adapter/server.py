@@ -1394,6 +1394,7 @@ class HermesACPAgent(acp.Agent):
 
         tool_call_ids: dict[str, Deque[str]] = defaultdict(deque)
         tool_call_meta: dict[str, dict[str, Any]] = {}
+        read_snapshots_cache: dict[str, str | None] = {}
         previous_approval_cb = None
         edit_approval_requester = None
 
@@ -1406,10 +1407,12 @@ class HermesACPAgent(acp.Agent):
                 loop,
                 tool_call_ids,
                 tool_call_meta,
+                read_snapshots_cache,
                 edit_approval_policy_getter=lambda: self._edit_approval_policy_for_state(state),
             )
             reasoning_cb = make_thinking_cb(conn, session_id, loop)
-            step_cb = make_step_cb(conn, session_id, loop, tool_call_ids, tool_call_meta)
+            step_cb = make_step_cb(conn, session_id, loop, tool_call_ids, tool_call_meta,
+                                    read_snapshots_cache)
             message_cb = make_message_cb(conn, session_id, loop)
 
             def stream_delta_cb(text: str) -> None:

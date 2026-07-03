@@ -295,7 +295,7 @@ def make_step_cb(
                         known = {p: b for p, b in read_snapshots_cache.items() if b is not None}
                         if known:
                             tool_call_meta.setdefault(tc_id, {})["snapshot"] = LocalEditSnapshot(
-                                paths=list(known.keys()),
+                                paths=[Path(p) for p in known.keys()],
                                 before=known,
                             )
                             logger.debug(

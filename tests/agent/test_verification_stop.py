@@ -250,6 +250,7 @@ def test_no_suite_nudge_requests_temp_script(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
     (tmp_path / "package.json").write_text("{}", encoding="utf-8")
     changed = str(tmp_path / "src" / "app.ts")
+    mark_workspace_edited(session_id="s1", cwd=tmp_path, paths=[changed])
 
     nudge = build_verify_on_stop_nudge(session_id="s1", changed_paths=[changed])
 
@@ -270,6 +271,9 @@ def test_no_suite_nudge_uses_canonical_temp_dir(tmp_path, monkeypatch):
     linked_temp = tmp_path / "linked-temp"
     linked_temp.symlink_to(real_temp, target_is_directory=True)
     monkeypatch.setattr(tempfile, "gettempdir", lambda: str(linked_temp))
+    mark_workspace_edited(
+        session_id="s1", cwd=project, paths=[str(project / "src" / "app.ts")]
+    )
 
     nudge = build_verify_on_stop_nudge(
         session_id="s1",
@@ -285,6 +289,7 @@ def test_verify_guidance_can_be_disabled(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
     _node_project(tmp_path)
     changed = str(tmp_path / "src" / "app.ts")
+    mark_workspace_edited(session_id="s1", cwd=tmp_path, paths=[changed])
 
     from agent import verify_hooks
 

@@ -193,25 +193,46 @@ def _verification_snapshot(
     session_id: str | None,
     changed_paths: list[str],
 ) -> tuple[dict[str, Any], dict[str, Any]] | None:
-    """Return ``(status, facts)`` for the first edited workspace needing proof."""
+    """Return ``(status, facts)`` for the first edited workspace needing proof.
+
+    A workspace that reports ``"passed"`` (verification ran and no subsequent
+    edits) or ``"unverified"`` with an empty ``changed_paths`` list (no edits
+    were ever recorded, so there is nothing to verify) is treated as
+    proof-complete — the snapshot is skipped.  Only workspaces with actual
+    outstanding changes (``"unverified"`` with non-empty changed_paths,
+    ``"stale"``, or ``"failed"``) are returned.
+    """
     try:
         from agent.coding_context import project_facts_for
         from agent.verification_evidence import verification_status
     except Exception:
         return None
 
-    first_snapshot: tuple[dict[str, Any], dict[str, Any]] | None = None
     for cwd in _candidate_cwds(changed_paths):
         facts = project_facts_for(cwd)
         if not facts:
             continue
         status = verification_status(session_id=session_id, cwd=cwd)
-        snapshot = (status, facts)
-        if first_snapshot is None:
-            first_snapshot = snapshot
-        if str(status.get("status") or "unverified") != "passed":
-            return snapshot
-    return first_snapshot
+
+        state = str(status.get("status") or "unverified")
+
+        # Passed → fully verified, nothing to do.
+        if state == "passed":
+            continue
+
+        # Unverified with no recorded changed paths → workspace was either
+        # never edited or was verified and the edit list was cleared. Either
+        # way there is nothing concrete to re-verify, so treat as passed.
+        if state == "unverified":
+            changed = status.get("changed_paths")
+            if isinstance(changed, list) and len(changed) == 0:
+                continue
+
+        # Stale, failed, or unverified with actual pending changes → return
+        # this snapshot so the caller can build a nudge.
+        return (status, facts)
+
+    return None
 
 
 def _format_changed_paths(paths: list[str]) -> str:

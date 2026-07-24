@@ -117,7 +117,7 @@ def make_tool_progress_cb(
     loop: asyncio.AbstractEventLoop,
     tool_call_ids: Dict[str, Deque[str]],
     tool_call_meta: Dict[str, Dict[str, Any]],
-    read_snapshots_cache: Dict[str, str | None],
+    read_snapshots_cache: Dict[str, str | None] | None = None,
     edit_approval_policy_getter: Callable[[], tuple[str, str | None]] | None = None,
 ) -> Callable:
     """Create a ``tool_progress_callback`` for AIAgent.
@@ -170,23 +170,27 @@ def make_tool_progress_cb(
         #   not already cached — first writer wins, preserving the original
         #   baseline across multiple edits).
         # read_file: save current disk content (only if path not cached).
-        if name in {"write_file", "patch", "skill_manage"}:
+        if read_snapshots_cache is not None and name in {"write_file", "patch", "skill_manage"}:
             if snapshot is not None and snapshot.before is not None:
                 from pathlib import Path as _P
                 for rp, before_text in snapshot.before.items():
                     rk = str(_P(rp).resolve())
                     if rk not in read_snapshots_cache:
                         read_snapshots_cache[rk] = before_text
-        elif name == "read_file":
+        elif read_snapshots_cache is not None and name == "read_file":
             rp = args.get("path", "")
-            if rp:
+            if rp and isinstance(rp, str):
                 from pathlib import Path as _P
-                rk = str(_P(rp).resolve())
-                if rk not in read_snapshots_cache:
-                    try:
-                        read_snapshots_cache[rk] = _P(rk).read_text(encoding="utf-8")
-                    except (FileNotFoundError, OSError):
-                        read_snapshots_cache[rk] = None
+                try:
+                    rk = str(_P(rp).resolve())
+                except (TypeError, OSError):
+                    pass
+                else:
+                    if rk not in read_snapshots_cache:
+                        try:
+                            read_snapshots_cache[rk] = _P(rk).read_text(encoding="utf-8")
+                        except (FileNotFoundError, OSError):
+                            read_snapshots_cache[rk] = None
 
         edit_diff = None
         if name in {"write_file", "patch"} and edit_approval_policy_getter is not None:
@@ -237,7 +241,7 @@ def make_step_cb(
     loop: asyncio.AbstractEventLoop,
     tool_call_ids: Dict[str, Deque[str]],
     tool_call_meta: Dict[str, Dict[str, Any]],
-    read_snapshots_cache: Dict[str, str | None],
+    read_snapshots_cache: Dict[str, str | None] | None = None,
 ) -> Callable:
     """Create a ``step_callback`` for AIAgent.
 
